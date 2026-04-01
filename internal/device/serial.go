@@ -10,8 +10,13 @@ import (
 )
 
 type SerialConn struct {
-	port      serial.Port
+	port      Port
 	sessionMu sync.Mutex // locks entire +++ → cmd → EXIT session
+}
+
+// NewSerialConn wraps an existing Port into a SerialConn.
+func NewSerialConn(port Port) *SerialConn {
+	return &SerialConn{port: port}
 }
 
 func OpenSerial(device string, baud int) (*SerialConn, error) {
