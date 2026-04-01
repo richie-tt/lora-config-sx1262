@@ -24,10 +24,19 @@ func TestEnterAT_Success(t *testing.T) {
 }
 
 func TestEnterAT_UnexpectedResponse(t *testing.T) {
-	port := devicemock.ForResponses("ERROR")
+	// 3 retries, all return ERROR (no "+++")
+	port := devicemock.ForResponses("ERROR", "ERROR", "ERROR")
 	conn := NewSerialConn(port)
 
 	assert.ErrorContains(t, enterAT(conn), "unexpected response")
+}
+
+func TestEnterAT_SucceedsOnRetry(t *testing.T) {
+	// First attempt fails, second succeeds
+	port := devicemock.ForResponses("ERROR", "+++\r\nOK")
+	conn := NewSerialConn(port)
+
+	require.NoError(t, enterAT(conn))
 }
 
 func TestEnterAT_WriteError(t *testing.T) {
@@ -64,7 +73,7 @@ func TestSetParam_Success(t *testing.T) {
 }
 
 func TestSetParam_EnterATFails(t *testing.T) {
-	port := devicemock.ForResponses("ERROR")
+	port := devicemock.ForResponses("ERROR", "ERROR", "ERROR")
 	conn := NewSerialConn(port)
 
 	assert.ErrorContains(t, SetParam(conn, "SF", "7"), "enter AT mode")
@@ -106,7 +115,7 @@ func TestReadAllParamsAndVersion_Success(t *testing.T) {
 }
 
 func TestReadAllParamsAndVersion_EnterATFails(t *testing.T) {
-	port := devicemock.ForResponses("ERROR")
+	port := devicemock.ForResponses("ERROR", "ERROR", "ERROR")
 	conn := NewSerialConn(port)
 
 	params, version, err := ReadAllParamsAndVersion(conn)
@@ -154,7 +163,7 @@ func TestReboot_Success(t *testing.T) {
 }
 
 func TestReboot_EnterATFails(t *testing.T) {
-	port := devicemock.ForResponses("ERROR")
+	port := devicemock.ForResponses("ERROR", "ERROR", "ERROR")
 	conn := NewSerialConn(port)
 
 	assert.ErrorContains(t, Reboot(conn), "enter AT mode")

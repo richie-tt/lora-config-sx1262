@@ -71,6 +71,7 @@ func (s *SerialConn) sendAndRead(cmd string) (string, error) {
 			buf.Write(tmp[:n])
 			resp := buf.String()
 			if strings.Contains(resp, "OK") || strings.Contains(resp, "ERROR") || strings.Contains(resp, "+++") {
+				time.Sleep(interCmdDelay)
 				return strings.TrimSpace(resp), nil
 			}
 		}

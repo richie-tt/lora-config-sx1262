@@ -7,20 +7,36 @@ import (
 )
 
 const (
-	atTimeout     = 3 * time.Second
-	postExitDelay = 1 * time.Second
+	atTimeout      = 3 * time.Second
+	postExitDelay  = 1 * time.Second
+	preEnterDelay  = 300 * time.Millisecond
+	interCmdDelay  = 100 * time.Millisecond
+	enterATRetries = 3
 )
 
-// enterAT sends +++ and expects echo. Caller must hold session lock.
+// enterAT sends +++ and expects echo, with retries and guard time.
+// Caller must hold session lock.
 func enterAT(conn *SerialConn) error {
-	resp, err := conn.sendAndRead("+++\r\n")
-	if err != nil {
-		return fmt.Errorf("enter AT mode: %w", err)
+	var lastErr error
+	for attempt := range enterATRetries {
+		if attempt > 0 {
+			time.Sleep(preEnterDelay)
+		}
+		_ = conn.port.ResetInputBuffer()
+		time.Sleep(preEnterDelay)
+
+		resp, err := conn.sendAndRead("+++\r\n")
+		if err != nil {
+			lastErr = fmt.Errorf("enter AT mode: %w", err)
+			continue
+		}
+		if !strings.Contains(resp, "+++") {
+			lastErr = fmt.Errorf("enter AT mode: unexpected response: %s", resp)
+			continue
+		}
+		return nil
 	}
-	if !strings.Contains(resp, "+++") {
-		return fmt.Errorf("enter AT mode: unexpected response: %s", resp)
-	}
-	return nil
+	return lastErr
 }
 
 // exitAT sends AT+EXIT and expects OK. Caller must hold session lock.
