@@ -1,4 +1,4 @@
-package main
+package device
 
 import (
 	"fmt"
@@ -6,12 +6,14 @@ import (
 	"time"
 )
 
-const atTimeout = 3 * time.Second
-const postExitDelay = 1 * time.Second
+const (
+	atTimeout     = 3 * time.Second
+	postExitDelay = 1 * time.Second
+)
 
 // enterAT sends +++ and expects echo. Caller must hold session lock.
 func enterAT(conn *SerialConn) error {
-	resp, err := conn.sendAndRead("+++\r\n", atTimeout)
+	resp, err := conn.sendAndRead("+++\r\n")
 	if err != nil {
 		return fmt.Errorf("enter AT mode: %w", err)
 	}
@@ -23,7 +25,7 @@ func enterAT(conn *SerialConn) error {
 
 // exitAT sends AT+EXIT and expects OK. Caller must hold session lock.
 func exitAT(conn *SerialConn) error {
-	resp, err := conn.sendAndRead("AT+EXIT\r\n", atTimeout)
+	resp, err := conn.sendAndRead("AT+EXIT\r\n")
 	if err != nil {
 		return fmt.Errorf("exit AT mode: %w", err)
 	}
@@ -44,13 +46,13 @@ func SetParam(conn *SerialConn, atCmd, value string) error {
 	}
 
 	cmd := fmt.Sprintf("AT+%s=%s\r\n", atCmd, value)
-	resp, err := conn.sendAndRead(cmd, atTimeout)
+	resp, err := conn.sendAndRead(cmd)
 	if err != nil {
-		exitAT(conn)
+		_ = exitAT(conn)
 		return fmt.Errorf("set %s=%s: %w", atCmd, value, err)
 	}
 	if !strings.Contains(resp, "OK") {
-		exitAT(conn)
+		_ = exitAT(conn)
 		return fmt.Errorf("set %s=%s: %s", atCmd, value, resp)
 	}
 
@@ -66,20 +68,20 @@ func ReadAllParamsAndVersion(conn *SerialConn) (map[string]string, string, error
 		return nil, "", err
 	}
 
-	resp, err := conn.sendAndRead("AT+ALLP?\r\n", atTimeout)
+	resp, err := conn.sendAndRead("AT+ALLP?\r\n")
 	if err != nil {
-		exitAT(conn)
+		_ = exitAT(conn)
 		return nil, "", fmt.Errorf("read ALLP: %w", err)
 	}
 
 	params, err := parseALLP(resp)
 	if err != nil {
-		exitAT(conn)
+		_ = exitAT(conn)
 		return nil, "", err
 	}
 
 	// Read version in same session
-	verResp, _ := conn.sendAndRead("AT+VER\r\n", atTimeout)
+	verResp, _ := conn.sendAndRead("AT+VER\r\n")
 	version := parseVersion(verResp)
 
 	if err := exitAT(conn); err != nil {
@@ -101,7 +103,7 @@ func Reboot(conn *SerialConn) error {
 	if err := enterAT(conn); err != nil {
 		return err
 	}
-	_, err := conn.sendAndRead("AT+REBOOT\r\n", atTimeout)
+	_, err := conn.sendAndRead("AT+REBOOT\r\n")
 	return err
 }
 
@@ -137,16 +139,16 @@ func splitALLP(s string) []string {
 	var current strings.Builder
 	inQuote := false
 
-	for _, r := range s {
+	for _, char := range s {
 		switch {
-		case r == '"':
+		case char == '"':
 			inQuote = !inQuote
-			current.WriteRune(r)
-		case r == ',' && !inQuote:
+			current.WriteRune(char)
+		case char == ',' && !inQuote:
 			parts = append(parts, current.String())
 			current.Reset()
 		default:
-			current.WriteRune(r)
+			current.WriteRune(char)
 		}
 	}
 	if current.Len() > 0 {

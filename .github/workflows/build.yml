@@ -40,7 +40,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go build -o lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
+          go build -o lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/lora-config-sx1262
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

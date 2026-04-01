@@ -1,7 +1,8 @@
-package main
+package tui
 
 import (
 	"fmt"
+	"lora-config-SX1262/internal/device"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -19,7 +20,7 @@ const (
 
 // Messages
 type connectResultMsg struct {
-	conn    *SerialConn
+	conn    *device.SerialConn
 	params  map[string]string
 	version string
 	err     error
@@ -44,7 +45,7 @@ type model struct {
 	focusIndex  int // -1=device, -2=connect, -3=restore, -4=reboot, 0..N=field index
 	connected   bool
 	connecting  bool
-	conn        *SerialConn
+	conn        *device.SerialConn
 	version     string
 	statusMsg   string
 	width       int
@@ -55,17 +56,18 @@ type model struct {
 	rightCol []int
 }
 
-func initialModel() model {
-	ti := textinput.New()
-	ti.Placeholder = "/dev/ttyACM0"
-	ti.SetValue("/dev/ttyACM0")
-	ti.CharLimit = 64
-	ti.Width = 30
-	ti.Focus()
+// InitialModel returns the initial BubbleTea model for the application.
+func InitialModel() tea.Model {
+	deviceInput := textinput.New()
+	deviceInput.Placeholder = "/dev/ttyACM0"
+	deviceInput.SetValue("/dev/ttyACM0")
+	deviceInput.CharLimit = 64
+	deviceInput.Width = 30
+	deviceInput.Focus()
 
-	fields := make([]Field, len(AllParams))
-	for i, p := range AllParams {
-		fields[i] = NewField(p)
+	fields := make([]Field, len(allParams))
+	for i, p := range allParams {
+		fields[i] = newField(p)
 		fields[i].Disabled = true
 	}
 
@@ -83,7 +85,7 @@ func initialModel() model {
 
 	return model{
 		fields:      fields,
-		deviceInput: ti,
+		deviceInput: deviceInput,
 		focusIndex:  focusDevice,
 		leftCol:     left,
 		rightCol:    right,
@@ -172,9 +174,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
-
-		// case tea.MouseMsg:
-		// 	return m.handleMouse(msg)
 	}
 
 	// Forward non-key messages to active text inputs (for cursor blink)
@@ -196,9 +195,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
-	// Global keys
-	switch key {
-	case "ctrl+c":
+	if key == "ctrl+c" {
 		if m.conn != nil {
 			m.conn.Close()
 		}
@@ -269,67 +266,67 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleNumInputKey(fieldIdx int, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	f := &m.fields[fieldIdx]
+	field := &m.fields[fieldIdx]
 	key := msg.String()
 
 	switch key {
 	case "enter":
 		// Validate and submit
-		val, ok := f.ValidateNumInput()
+		val, ok := field.ValidateNumInput()
 		if !ok {
-			m.statusMsg = fmt.Sprintf("%s: must be %d-%d", f.Label, f.Min, f.Max)
-			f.Status = StatusError
-			f.NumInput.SetValue(f.LastValue) // revert
-			f.Editing = false
-			f.NumInput.Blur()
+			m.statusMsg = fmt.Sprintf("%s: must be %d-%d", field.Label, field.Min, field.Max)
+			field.Status = StatusError
+			field.NumInput.SetValue(field.LastValue) // revert
+			field.Editing = false
+			field.NumInput.Blur()
 			return m, nil
 		}
-		f.NumInput.SetValue(val)
-		f.Editing = false
-		f.NumInput.Blur()
-		if m.conn != nil && val != f.LastValue {
-			f.LastValue = val
-			m.statusMsg = fmt.Sprintf("Setting %s = %s...", f.ATCmd, val)
+		field.NumInput.SetValue(val)
+		field.Editing = false
+		field.NumInput.Blur()
+		if m.conn != nil && val != field.LastValue {
+			field.LastValue = val
+			m.statusMsg = fmt.Sprintf("Setting %s = %s...", field.ATCmd, val)
 			return m, m.setParamCmd(fieldIdx)
 		}
-		f.LastValue = val
+		field.LastValue = val
 		return m, nil
 	case "esc":
 		// Cancel editing, revert
-		f.NumInput.SetValue(f.LastValue)
-		f.Editing = false
-		f.NumInput.Blur()
+		field.NumInput.SetValue(field.LastValue)
+		field.Editing = false
+		field.NumInput.Blur()
 		return m, nil
 	default:
 		// Forward to text input (only allow digits)
 		var cmd tea.Cmd
-		f.NumInput, cmd = f.NumInput.Update(msg)
+		field.NumInput, cmd = field.NumInput.Update(msg)
 		return m, cmd
 	}
 }
 
 func (m model) handleDropdownKey(fieldIdx int, key string) (tea.Model, tea.Cmd) {
-	f := &m.fields[fieldIdx]
+	field := &m.fields[fieldIdx]
 
 	switch key {
 	case "up", "k":
-		f.MoveUp()
+		field.MoveUp()
 	case "down", "j":
-		f.MoveDown()
+		field.MoveDown()
 	case "enter":
-		prevValue := f.LastValue
-		f.Open = false
-		newValue := f.SelectedValue()
-		f.LastValue = newValue
+		prevValue := field.LastValue
+		field.Open = false
+		newValue := field.SelectedValue()
+		field.LastValue = newValue
 		// Only send AT command if value actually changed
 		if m.conn != nil && newValue != prevValue {
-			m.statusMsg = fmt.Sprintf("Setting %s = %s...", f.ATCmd, f.SelectedDisplay())
+			m.statusMsg = fmt.Sprintf("Setting %s = %s...", field.ATCmd, field.SelectedDisplay())
 			return m, m.setParamCmd(fieldIdx)
 		}
 	case "esc":
 		// Revert to previous selection
-		f.SetByValue(f.LastValue)
-		f.Open = false
+		field.SetByValue(field.LastValue)
+		field.Open = false
 	}
 	return m, nil
 }
@@ -358,18 +355,18 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 		}
 	default:
 		if m.focusIndex >= 0 && m.focusIndex < len(m.fields) {
-			f := &m.fields[m.focusIndex]
-			if !f.Disabled {
-				f.Status = StatusNormal
-				if f.IsNumInput {
+			field := &m.fields[m.focusIndex]
+			if !field.Disabled {
+				field.Status = StatusNormal
+				if field.IsNumInput {
 					// Start editing numeric field
-					f.Editing = true
-					f.LastValue = f.NumInput.Value()
-					cmd := f.NumInput.Focus()
-					m.statusMsg = fmt.Sprintf("Editing %s (%d-%d), Enter to confirm, Esc to cancel", f.Label, f.Min, f.Max)
+					field.Editing = true
+					field.LastValue = field.NumInput.Value()
+					cmd := field.NumInput.Focus()
+					m.statusMsg = fmt.Sprintf("Editing %s (%d-%d), Enter to confirm, Esc to cancel", field.Label, field.Min, field.Max)
 					return m, cmd
 				}
-				f.ToggleOpen()
+				field.ToggleOpen()
 			}
 		}
 	}
@@ -535,15 +532,6 @@ func (m model) fieldPosition(idx int) (col, row int) {
 	return 0, 0
 }
 
-func (m model) anyDropdownOpen() bool {
-	for _, f := range m.fields {
-		if f.Open {
-			return true
-		}
-	}
-	return false
-}
-
 func (m model) openDropdownIndex() int {
 	for i, f := range m.fields {
 		if f.Open {
@@ -562,126 +550,18 @@ func (m model) editingFieldIndex() int {
 	return -1
 }
 
-// Mouse handling
-//
-// Layout rows (fixed):
-//   0-2: title area (3 lines: title + margin + blank)
-//   3-5: device row (3 lines with border)
-//   6-7: separator + blank
-//   8+:  field grid, each field row = 3 lines (border+content+border)
-//         row 0: lines 8-10, row 1: lines 11-13, etc.
-//   after grid: blank, then buttons row (3 lines with border)
-
-func (m model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if msg.Button != tea.MouseButtonLeft || msg.Action != tea.MouseActionRelease {
-		return m, nil
-	}
-
-	y := msg.Y
-	x := msg.X
-
-	// Close any open dropdown/editing
-	for i := range m.fields {
-		if m.fields[i].Open {
-			m.fields[i].Open = false
-		}
-		if m.fields[i].Editing {
-			m.fields[i].NumInput.SetValue(m.fields[i].LastValue)
-			m.fields[i].Editing = false
-			m.fields[i].NumInput.Blur()
-		}
-	}
-
-	// Device row: lines 3-5
-	if y >= 3 && y <= 5 {
-		if x >= 50 {
-			// Connect button area
-			m.focusIndex = focusConnect
-			m.updateFocus()
-			return m.handleEnter()
-		}
-		if !m.connected {
-			m.focusIndex = focusDevice
-			m.updateFocus()
-		}
-		return m, nil
-	}
-
-	// Field grid starts at line 8, each row = 3 lines
-	gridStart := 8
-	maxRows := len(m.leftCol)
-	if len(m.rightCol) > maxRows {
-		maxRows = len(m.rightCol)
-	}
-	gridEnd := gridStart + maxRows*3
-
-	if y >= gridStart && y < gridEnd {
-		row := (y - gridStart) / 3
-
-		// Determine column by x position
-		var target int = -1
-		if x < 36 {
-			// Left column
-			if row < len(m.leftCol) {
-				target = m.leftCol[row]
-			}
-		} else {
-			// Right column
-			if row < len(m.rightCol) {
-				target = m.rightCol[row]
-			}
-		}
-
-		if target >= 0 && target < len(m.fields) {
-			f := &m.fields[target]
-			if !f.Disabled {
-				m.focusIndex = target
-				m.updateFocus()
-				f.Status = StatusNormal
-				if f.IsNumInput {
-					f.Editing = true
-					f.LastValue = f.NumInput.Value()
-					cmd := f.NumInput.Focus()
-					m.statusMsg = fmt.Sprintf("Editing %s (%d-%d), Enter to confirm, Esc to cancel", f.Label, f.Min, f.Max)
-					return m, cmd
-				}
-				f.ToggleOpen()
-			}
-		}
-		return m, nil
-	}
-
-	// Buttons row: after grid + 1 blank line
-	btnStart := gridEnd + 1
-	btnEnd := btnStart + 2
-	if y >= btnStart && y <= btnEnd {
-		if x < 20 {
-			m.focusIndex = focusRestore
-			m.updateFocus()
-			return m.handleEnter()
-		} else if x < 40 {
-			m.focusIndex = focusReboot
-			m.updateFocus()
-			return m.handleEnter()
-		}
-		return m, nil
-	}
-
-	return m, nil
-}
-
 // Commands
 
 func (m model) connectCmd() tea.Cmd {
-	device := m.deviceInput.Value()
+	devicePath := m.deviceInput.Value()
 	return func() tea.Msg {
-		conn, err := OpenSerial(device, 115200)
+		conn, err := device.OpenSerial(devicePath, 115200)
 		if err != nil {
 			return connectResultMsg{err: err}
 		}
 
 		// Single session: +++ → AT+ALLP? → AT+VER → AT+EXIT
-		params, version, err := ReadAllParamsAndVersion(conn)
+		params, version, err := device.ReadAllParamsAndVersion(conn)
 		if err != nil {
 			conn.Close()
 			return connectResultMsg{err: err}
@@ -696,10 +576,10 @@ func (m model) connectCmd() tea.Cmd {
 }
 
 func (m *model) setParamCmd(fieldIdx int) tea.Cmd {
-	f := m.fields[fieldIdx]
+	field := m.fields[fieldIdx]
 	conn := m.conn
 	return func() tea.Msg {
-		err := SetParam(conn, f.ATCmd, f.SelectedValue())
+		err := device.SetParam(conn, field.ATCmd, field.SelectedValue())
 		return paramResultMsg{
 			fieldIndex: fieldIdx,
 			ok:         err == nil,
@@ -711,113 +591,104 @@ func (m *model) setParamCmd(fieldIdx int) tea.Cmd {
 func (m model) restoreCmd() tea.Cmd {
 	conn := m.conn
 	return func() tea.Msg {
-		return restoreResultMsg{err: Restore(conn)}
+		return restoreResultMsg{err: device.Restore(conn)}
 	}
 }
 
 func (m model) rebootCmd() tea.Cmd {
 	conn := m.conn
 	return func() tea.Msg {
-		return rebootResultMsg{err: Reboot(conn)}
+		return rebootResultMsg{err: device.Reboot(conn)}
 	}
 }
 
 // overlayString places overlay on top of base at the given column offset.
-// It replaces characters in base with overlay content, preserving ANSI sequences.
 func overlayString(base, overlay string, col int) string {
-	// Simple approach: pad base to col, then append overlay, then append rest of base
 	baseRunes := []rune(stripAnsi(base))
 	baseWidth := len(baseRunes)
 
-	// Ensure base is wide enough
 	if baseWidth < col {
 		base += strings.Repeat(" ", col-baseWidth)
 	}
 
-	// Split base into: before overlay, and after overlay
-	// We work with raw strings and use visual width
 	lines := base
 	overlayWidth := lipgloss.Width(overlay)
 
-	// Build result: take base up to col, add overlay, then rest of base after overlay
 	baseBefore := truncateToWidth(lines, col)
 	baseAfter := skipWidth(lines, col+overlayWidth)
 
 	return baseBefore + overlay + baseAfter
 }
 
-// truncateToWidth returns the prefix of s up to the given visual width.
-func truncateToWidth(s string, width int) string {
+func truncateToWidth(str string, width int) string {
 	if width <= 0 {
 		return ""
 	}
 	var result strings.Builder
-	w := 0
+	visWidth := 0
 	inEsc := false
-	for _, r := range s {
-		if r == '\x1b' {
+	for _, char := range str {
+		if char == '\x1b' {
 			inEsc = true
-			result.WriteRune(r)
+			result.WriteRune(char)
 			continue
 		}
 		if inEsc {
-			result.WriteRune(r)
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			result.WriteRune(char)
+			if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') {
 				inEsc = false
 			}
 			continue
 		}
-		if w >= width {
+		if visWidth >= width {
 			break
 		}
-		result.WriteRune(r)
-		w++
+		result.WriteRune(char)
+		visWidth++
 	}
 	return result.String()
 }
 
-// skipWidth skips the first `width` visible characters of s, returning the rest.
-func skipWidth(s string, width int) string {
+func skipWidth(str string, width int) string {
 	if width <= 0 {
-		return s
+		return str
 	}
-	w := 0
+	visWidth := 0
 	inEsc := false
-	for i, r := range s {
-		if r == '\x1b' {
+	for idx, char := range str {
+		if char == '\x1b' {
 			inEsc = true
 			continue
 		}
 		if inEsc {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') {
 				inEsc = false
 			}
 			continue
 		}
-		if w >= width {
-			return s[i:]
+		if visWidth >= width {
+			return str[idx:]
 		}
-		w++
+		visWidth++
 	}
 	return ""
 }
 
-// stripAnsi removes ANSI escape sequences from a string.
-func stripAnsi(s string) string {
+func stripAnsi(str string) string {
 	var result strings.Builder
 	inEsc := false
-	for _, r := range s {
-		if r == '\x1b' {
+	for _, char := range str {
+		if char == '\x1b' {
 			inEsc = true
 			continue
 		}
 		if inEsc {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') {
 				inEsc = false
 			}
 			continue
 		}
-		result.WriteRune(r)
+		result.WriteRune(char)
 	}
 	return result.String()
 }
@@ -868,11 +739,11 @@ var (
 )
 
 func (m model) View() string {
-	var b strings.Builder
+	var view strings.Builder
 
 	// Title
-	b.WriteString(titleStyle.Render("  LoRa Configurator for SX1262"))
-	b.WriteString("\n\n")
+	view.WriteString(titleStyle.Render("  LoRa Configurator for SX1262"))
+	view.WriteString("\n\n")
 
 	// Device row
 	deviceLabel := labelStyle.Render("Device")
@@ -895,13 +766,13 @@ func (m model) View() string {
 	}
 
 	deviceRow := lipgloss.JoinHorizontal(lipgloss.Center, deviceLabel, deviceField, "  ", connectBtn)
-	b.WriteString(deviceRow)
-	b.WriteString("\n")
+	view.WriteString(deviceRow)
+	view.WriteString("\n")
 
 	// Separator
 	sep := separatorStyle.Render(strings.Repeat("─", 70))
-	b.WriteString(sep)
-	b.WriteString("\n\n")
+	view.WriteString(sep)
+	view.WriteString("\n\n")
 
 	// Two-column parameter fields
 	maxRows := len(m.leftCol)
@@ -918,7 +789,7 @@ func (m model) View() string {
 	}
 
 	var gridLines []string
-	for row := 0; row < maxRows; row++ {
+	for row := range maxRows {
 		var leftView, rightView string
 
 		if row < len(m.leftCol) {
@@ -969,25 +840,26 @@ func (m model) View() string {
 	}
 
 	for _, gl := range gridLines {
-		b.WriteString(gl)
-		b.WriteString("\n")
+		view.WriteString(gl)
+		view.WriteString("\n")
 	}
 
-	b.WriteString("\n")
+	view.WriteString("\n")
 
 	// Bottom buttons row
 	var restoreBtn, rebootBtn string
 
-	if !m.connected {
+	switch {
+	case !m.connected:
 		restoreBtn = buttonDisabledStyle.Render("Restore")
 		rebootBtn = buttonDisabledStyle.Render("Reboot")
-	} else if m.focusIndex == focusRestore {
+	case m.focusIndex == focusRestore:
 		restoreBtn = buttonFocusedStyle.Render("Restore")
 		rebootBtn = buttonStyle.Render("Reboot")
-	} else if m.focusIndex == focusReboot {
+	case m.focusIndex == focusReboot:
 		restoreBtn = buttonStyle.Render("Restore")
 		rebootBtn = buttonFocusedStyle.Render("Reboot")
-	} else {
+	default:
 		restoreBtn = buttonStyle.Render("Restore")
 		rebootBtn = buttonStyle.Render("Reboot")
 	}
@@ -1000,16 +872,16 @@ func (m model) View() string {
 	buttonsRow := lipgloss.JoinHorizontal(lipgloss.Center,
 		"  ", restoreBtn, "  ", rebootBtn, versionText,
 	)
-	b.WriteString(buttonsRow)
-	b.WriteString("\n")
+	view.WriteString(buttonsRow)
+	view.WriteString("\n")
 
 	// Status bar
-	b.WriteString(statusBarStyle.Render(fmt.Sprintf("  %s", m.statusMsg)))
-	b.WriteString("\n")
+	view.WriteString(statusBarStyle.Render(fmt.Sprintf("  %s", m.statusMsg)))
+	view.WriteString("\n")
 
 	// Help
 	help := "Tab/Shift+Tab: navigate • Enter: select • ↑↓: move • ←→: switch column • Click: select • q: quit"
-	b.WriteString(helpStyle.Render("  " + help))
+	view.WriteString(helpStyle.Render("  " + help))
 
-	return b.String()
+	return view.String()
 }

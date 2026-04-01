@@ -43,7 +43,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go build -o lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
+          go build -o lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/lora-config-sx1262
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -65,24 +65,53 @@ jobs:
         run: |
           LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
           if [ -z "$LATEST_TAG" ]; then
-            NEW_TAG="v0.1.0"
-          else
-            # Increment patch version
-            MAJOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f1)
-            MINOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f2)
-            PATCH=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f3)
-            PATCH=$((PATCH + 1))
-            NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+            LATEST_TAG="v0.0.0"
           fi
+
+          MAJOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f1)
+          MINOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f2)
+          PATCH=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f3)
+
+          # Analyze commit messages since last tag
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            COMMITS=$(git log --oneline --format="%s")
+          else
+            COMMITS=$(git log --oneline --format="%s" "${LATEST_TAG}..HEAD")
+          fi
+
+          BUMP="none"
+          while IFS= read -r msg; do
+            if echo "$msg" | grep -qiE '^feat(\(.+\))?:'; then
+              BUMP="minor"
+            elif echo "$msg" | grep -qiE '^fix(\(.+\))?:' && [ "$BUMP" != "minor" ]; then
+              BUMP="patch"
+            fi
+          done <<< "$COMMITS"
+
+          if [ "$BUMP" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          elif [ "$BUMP" = "patch" ]; then
+            PATCH=$((PATCH + 1))
+          else
+            echo "No fix: or feat: commits found — skipping release."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
           echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
-          echo "New version: $NEW_TAG"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "New version: $NEW_TAG (bump: $BUMP)"
 
       - name: Download all artifacts
+        if: steps.version.outputs.skip != 'true'
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
       - name: Prepare release assets
+        if: steps.version.outputs.skip != 'true'
         run: |
           mkdir -p release
           for dir in artifacts/*/; do
@@ -91,6 +120,7 @@ jobs:
           ls -la release/
 
       - name: Create tag
+        if: steps.version.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -98,6 +128,7 @@ jobs:
           git push origin ${{ steps.version.outputs.tag }}
 
       - name: Generate changelog
+        if: steps.version.outputs.skip != 'true'
         id: changelog
         run: |
           LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
@@ -114,6 +145,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
+        if: steps.version.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}

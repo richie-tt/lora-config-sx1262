@@ -1,4 +1,4 @@
-package main
+package device
 
 import (
 	"fmt"
@@ -48,8 +48,8 @@ func (s *SerialConn) UnlockSession() {
 }
 
 // sendAndRead writes a command and reads the response. NOT thread-safe — caller must hold session lock.
-func (s *SerialConn) sendAndRead(cmd string, timeout time.Duration) (string, error) {
-	s.port.ResetInputBuffer()
+func (s *SerialConn) sendAndRead(cmd string) (string, error) {
+	_ = s.port.ResetInputBuffer()
 
 	_, err := s.port.Write([]byte(cmd))
 	if err != nil {
@@ -57,7 +57,7 @@ func (s *SerialConn) sendAndRead(cmd string, timeout time.Duration) (string, err
 	}
 
 	var buf strings.Builder
-	deadline := time.Now().Add(timeout)
+	deadline := time.Now().Add(atTimeout)
 	tmp := make([]byte, 256)
 
 	for time.Now().Before(deadline) {

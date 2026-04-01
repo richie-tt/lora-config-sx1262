@@ -1,4 +1,4 @@
-package main
+package tui
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// FieldStatus represents the visual state of a field after an operation.
 type FieldStatus int
 
 const (
@@ -17,6 +18,7 @@ const (
 	StatusError
 )
 
+// Field represents a single configurable parameter in the TUI.
 type Field struct {
 	Label     string
 	Options   []Option
@@ -39,26 +41,26 @@ type Field struct {
 	LastValue  string
 }
 
-func NewField(pd ParamDef) Field {
-	f := Field{
-		Label:      pd.Label,
-		Options:    pd.Options,
-		ATCmd:      pd.ATCmd,
-		AllpIndex:  pd.AllpIndex,
+func newField(param ParamDef) Field {
+	field := Field{
+		Label:      param.Label,
+		Options:    param.Options,
+		ATCmd:      param.ATCmd,
+		AllpIndex:  param.AllpIndex,
 		maxVisible: 8,
-		IsNumInput: pd.IsNumInput,
-		Min:        pd.Min,
-		Max:        pd.Max,
+		IsNumInput: param.IsNumInput,
+		Min:        param.Min,
+		Max:        param.Max,
 	}
-	if pd.IsNumInput {
-		ti := textinput.New()
-		ti.Width = 12
-		ti.CharLimit = len(fmt.Sprintf("%d", pd.Max))
-		ti.Placeholder = fmt.Sprintf("%d-%d", pd.Min, pd.Max)
-		ti.SetValue("0")
-		f.NumInput = ti
+	if param.IsNumInput {
+		input := textinput.New()
+		input.Width = 12
+		input.CharLimit = len(fmt.Sprintf("%d", param.Max))
+		input.Placeholder = fmt.Sprintf("%d-%d", param.Min, param.Max)
+		input.SetValue("0")
+		field.NumInput = input
 	}
-	return f
+	return field
 }
 
 func (f *Field) SelectedValue() string {
@@ -101,14 +103,14 @@ func (f *Field) ValidateNumInput() (string, bool) {
 	if val == "" {
 		return "", false
 	}
-	n, err := strconv.Atoi(val)
+	num, err := strconv.Atoi(val)
 	if err != nil {
 		return "", false
 	}
-	if n < f.Min || n > f.Max {
+	if num < f.Min || num > f.Max {
 		return "", false
 	}
-	return fmt.Sprintf("%d", n), true
+	return fmt.Sprintf("%d", num), true
 }
 
 func (f *Field) MoveUp() {
@@ -153,10 +155,10 @@ var (
 			PaddingRight(1)
 
 	fieldNormalStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240")).
-			Width(16).
-			Padding(0, 1)
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("240")).
+				Width(16).
+				Padding(0, 1)
 
 	fieldFocusedStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
@@ -210,9 +212,6 @@ var (
 
 	normalItemStyle = lipgloss.NewStyle().
 			Width(16)
-
-	rangeHintStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241"))
 )
 
 func (f *Field) ViewClosed() string {
@@ -224,7 +223,6 @@ func (f *Field) ViewClosed() string {
 	switch {
 	case f.Disabled:
 		style = fieldDisabledStyle
-		display = "---"
 	case f.IsNumInput && f.Editing:
 		style = fieldFocusedStyle
 		return lipgloss.JoinHorizontal(lipgloss.Center, label, style.Render(f.NumInput.View()))
@@ -276,15 +274,15 @@ func (f *Field) RenderDropdown() string {
 		end = len(f.Options)
 	}
 
-	for i := f.scrollOffset; i < end; i++ {
-		opt := f.Options[i]
+	for idx := f.scrollOffset; idx < end; idx++ {
+		opt := f.Options[idx]
 		line := fmt.Sprintf(" %s", opt.Display)
-		if i == f.Selected {
+		if idx == f.Selected {
 			items.WriteString(selectedItemStyle.Render(line))
 		} else {
 			items.WriteString(normalItemStyle.Render(line))
 		}
-		if i < end-1 {
+		if idx < end-1 {
 			items.WriteString("\n")
 		}
 	}

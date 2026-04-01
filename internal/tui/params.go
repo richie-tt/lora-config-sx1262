@@ -1,12 +1,14 @@
-package main
+package tui
 
 import "fmt"
 
+// Option represents a single selectable value in a dropdown field.
 type Option struct {
 	Value   string // raw value sent to AT command
 	Display string // human-readable label
 }
 
+// ParamDef defines a device parameter and its UI representation.
 type ParamDef struct {
 	Label     string   // UI label
 	ATCmd     string   // AT command name (e.g. "SF", "BW")
@@ -19,7 +21,7 @@ type ParamDef struct {
 }
 
 // ALLP order: SF,BW,CR,PWR,NETID,LBT,MODE,TXCH,RXCH,RSSI,ADDR,PORT,COMM,BAUD,KEY
-var AllParams = []ParamDef{
+var allParams = []ParamDef{
 	{
 		Label: "Spread Factor", ATCmd: "SF", AllpIndex: 0,
 		Options: rangeOptions(7, 12, ""),
@@ -119,9 +121,9 @@ var AllParams = []ParamDef{
 	},
 }
 
-func rangeOptions(min, max int, suffix string) []Option {
-	opts := make([]Option, 0, max-min+1)
-	for i := min; i <= max; i++ {
+func rangeOptions(minVal, maxVal int, suffix string) []Option {
+	opts := make([]Option, 0, maxVal-minVal+1)
+	for i := minVal; i <= maxVal; i++ {
 		v := fmt.Sprintf("%d", i)
 		d := v
 		if suffix != "" {
@@ -130,13 +132,4 @@ func rangeOptions(min, max int, suffix string) []Option {
 		opts = append(opts, Option{Value: v, Display: d})
 	}
 	return opts
-}
-
-func FindOptionIndex(opts []Option, value string) int {
-	for i, o := range opts {
-		if o.Value == value {
-			return i
-		}
-	}
-	return 0
 }
