@@ -6,27 +6,29 @@ on:
 
 jobs:
   pre-commit:
+    name: Pre-commit checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
       - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v9
         with:
           install-only: true
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: "3.x"
+          python-version: "3.14"
 
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
 
   build:
+    name: Build binaries
     needs: pre-commit
     strategy:
       matrix:
@@ -51,9 +53,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
@@ -65,7 +67,7 @@ jobs:
           go build -o lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/lora-config-sx1262
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}
           path: lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
