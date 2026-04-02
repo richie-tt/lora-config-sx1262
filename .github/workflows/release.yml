@@ -6,9 +6,11 @@ on:
 
 permissions:
   contents: write
+  statuses: write
 
 jobs:
   build:
+    name: Build binaries
     strategy:
       matrix:
         include:
@@ -52,6 +54,7 @@ jobs:
           path: lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
 
   release:
+    name: Create Release
     needs: build
     runs-on: ubuntu-latest
 

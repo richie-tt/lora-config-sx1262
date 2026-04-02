@@ -6,6 +6,7 @@ on:
 
 jobs:
   pre-commit:
+    name: Pre-commit checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -27,6 +28,7 @@ jobs:
         uses: pre-commit/action@v3.0.1
 
   build:
+    name: Build binaries
     needs: pre-commit
     strategy:
       matrix:
