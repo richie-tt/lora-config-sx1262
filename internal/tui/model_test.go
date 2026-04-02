@@ -13,7 +13,7 @@ import (
 var errTest = errors.New("test error")
 
 func testModel() model {
-	return InitialModel().(model)
+	return InitialModel("test", "abc123", "2024-01-01").(model)
 }
 
 func connectedModel() model {
