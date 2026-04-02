@@ -9,7 +9,7 @@ jobs:
     name: Pre-commit checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-go@v6
         with:
@@ -19,6 +19,7 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           install-only: true
+          version: "v2.11.4"
 
       - uses: actions/setup-python@v6
         with:
@@ -53,7 +54,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-go@v6
         with:
@@ -67,7 +68,7 @@ jobs:
           go build -o lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/lora-config-sx1262
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v5
         with:
           name: lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}
           path: lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}

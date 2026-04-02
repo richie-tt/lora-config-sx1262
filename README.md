@@ -2,7 +2,7 @@
 
 TUI application for configuring [Waveshare USB-TO-LoRa-xF](https://www.waveshare.com/wiki/USB-TO-LoRa-xF) devices via AT commands.
 
-<video src="assets/Screencast_20260401_093741.webm" autoplay loop muted playsinline></video>
+![demo](assets/demo.gif)
 
 ## Features
 
