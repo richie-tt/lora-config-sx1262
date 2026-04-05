@@ -1,3 +1,5 @@
+<img src="assets/lora.png" alt="drawing" width="800"/>
+
 # lora-config-SX1262
 
 TUI application for configuring [Waveshare USB-TO-LoRa-xF](https://www.waveshare.com/wiki/USB-TO-LoRa-xF) devices via AT commands.
