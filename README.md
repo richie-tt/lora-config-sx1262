@@ -80,24 +80,6 @@ AT+EXIT\r\n      -> device responds "OK"
 
 Sessions are mutex-protected and sequential. A 1-second delay after each `AT+EXIT` ensures the device returns to normal mode before the next session.
 
-## Project Structure
-
-```
-main.go     Entry point
-model.go    Bubbletea model, navigation, view rendering
-field.go    Dropdown and text input field component
-params.go   Parameter definitions and valid ranges
-at.go       AT command protocol (enter/exit, set, read, parse)
-serial.go   Serial port communication with session locking
-```
-
-## Dependencies
-
-- [bubbletea](https://github.com/charmbracelet/bubbletea) - TUI framework
-- [bubbles](https://github.com/charmbracelet/bubbles) - TUI components
-- [lipgloss](https://github.com/charmbracelet/lipgloss) - Terminal styling
-- [go.bug.st/serial](https://pkg.go.dev/go.bug.st/serial) - Serial port
-
 ## License
 
 MIT

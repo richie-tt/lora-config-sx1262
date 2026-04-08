@@ -45,7 +45,10 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go build -o lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/lora-config-sx1262
+          TAG=$(git tag -l 'v*' --sort=-v:refname --points-at HEAD | head -n1)
+          TAG=${TAG:-dev}
+          LDFLAGS="-X main.Tag=$TAG -X main.Commit=$(git rev-parse --short HEAD) -X 'main.BuildDate=$(date -u '+%d-%m-%Y %H:%M')'"
+          go build -ldflags "$LDFLAGS" -o lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/lora-config-sx1262
 
       - name: Upload artifact
         uses: actions/upload-artifact@v5

@@ -48,6 +48,9 @@ type model struct {
 	conn        *device.SerialConn
 	version     string
 	statusMsg   string
+	tag         string
+	commit      string
+	buildDate   string
 	width       int
 	height      int
 
@@ -57,7 +60,7 @@ type model struct {
 }
 
 // InitialModel returns the initial BubbleTea model for the application.
-func InitialModel() tea.Model {
+func InitialModel(tag, commit, buildDate string) tea.Model {
 	deviceInput := textinput.New()
 	deviceInput.Placeholder = "/dev/ttyACM0"
 	deviceInput.SetValue("/dev/ttyACM0")
@@ -90,6 +93,9 @@ func InitialModel() tea.Model {
 		leftCol:     left,
 		rightCol:    right,
 		statusMsg:   "Enter device path and press Connect",
+		tag:         tag,
+		commit:      commit,
+		buildDate:   buildDate,
 	}
 }
 
@@ -882,6 +888,10 @@ func (m model) View() string {
 	// Help
 	help := "Tab/Shift+Tab: navigate • Enter: select • ↑↓: move • ←→: switch column • Click: select • q: quit"
 	view.WriteString(helpStyle.Render("  " + help))
+	view.WriteString("\n\n")
+
+	buildInfo := fmt.Sprintf("  TAG: %s @%s (%s)", m.tag, m.commit, m.buildDate)
+	view.WriteString(helpStyle.Render(buildInfo))
 
 	return view.String()
 }
