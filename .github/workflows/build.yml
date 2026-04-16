@@ -3,6 +3,14 @@ name: Build
 on:
   pull_request:
     branches: [master]
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - "Makefile"
+      - ".github/workflows/**"
+      - ".golangci.yml"
+      - ".pre-commit-config.yaml"
 
 jobs:
   pre-commit:
