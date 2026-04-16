@@ -112,7 +112,7 @@ jobs:
 
       - name: Download all artifacts
         if: steps.version.outputs.skip != 'true'
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
