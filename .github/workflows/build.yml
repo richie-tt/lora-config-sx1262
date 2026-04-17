@@ -77,7 +77,7 @@ jobs:
           go build -ldflags "$LDFLAGS" -o lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/lora-config-sx1262
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}
           path: lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
