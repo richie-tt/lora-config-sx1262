@@ -22,7 +22,10 @@ func enterAT(conn *SerialConn) error {
 		if attempt > 0 {
 			time.Sleep(preEnterDelay)
 		}
-		_ = conn.port.ResetInputBuffer()
+		if err := conn.port.ResetInputBuffer(); err != nil {
+			lastErr = fmt.Errorf("enter AT mode: reset buffer: %w", err)
+			continue
+		}
 		time.Sleep(preEnterDelay)
 
 		resp, err := conn.sendAndRead("+++\r\n")
@@ -54,54 +57,46 @@ func exitAT(conn *SerialConn) error {
 
 // SetParam: full atomic session +++ → AT+CMD=value → AT+EXIT
 func SetParam(conn *SerialConn, atCmd, value string) error {
-	conn.LockSession()
-	defer conn.UnlockSession()
-
-	if err := enterAT(conn); err != nil {
-		return err
-	}
-
-	cmd := fmt.Sprintf("AT+%s=%s\r\n", atCmd, value)
-	resp, err := conn.sendAndRead(cmd)
-	if err != nil {
-		_ = exitAT(conn)
-		return fmt.Errorf("set %s=%s: %w", atCmd, value, err)
-	}
-	if !strings.Contains(resp, "OK") {
-		_ = exitAT(conn)
-		return fmt.Errorf("set %s=%s: %s", atCmd, value, resp)
-	}
-
-	return exitAT(conn)
+	return conn.withATSession(func() error {
+		cmd := fmt.Sprintf("AT+%s=%s\r\n", atCmd, value)
+		resp, err := conn.sendAndRead(cmd)
+		if err != nil {
+			return fmt.Errorf("set %s=%s: %w", atCmd, value, err)
+		}
+		if !strings.Contains(resp, "OK") {
+			return fmt.Errorf("set %s=%s: %s", atCmd, value, resp)
+		}
+		return nil
+	})
 }
 
 // ReadAllParamsAndVersion: single session +++ → AT+ALLP? → AT+VER → AT+EXIT
 func ReadAllParamsAndVersion(conn *SerialConn) (map[string]string, string, error) {
-	conn.LockSession()
-	defer conn.UnlockSession()
+	var params map[string]string
+	var version string
 
-	if err := enterAT(conn); err != nil {
-		return nil, "", err
-	}
+	err := conn.withATSession(func() error {
+		resp, err := conn.sendAndRead("AT+ALLP?\r\n")
+		if err != nil {
+			return fmt.Errorf("read ALLP: %w", err)
+		}
 
-	resp, err := conn.sendAndRead("AT+ALLP?\r\n")
+		p, err := parseALLP(resp)
+		if err != nil {
+			return err
+		}
+		params = p
+
+		// Read version in same session — non-fatal if it fails
+		verResp, verErr := conn.sendAndRead("AT+VER\r\n")
+		if verErr == nil {
+			version = parseVersion(verResp)
+		}
+
+		return nil
+	})
 	if err != nil {
-		_ = exitAT(conn)
-		return nil, "", fmt.Errorf("read ALLP: %w", err)
-	}
-
-	params, err := parseALLP(resp)
-	if err != nil {
-		_ = exitAT(conn)
 		return nil, "", err
-	}
-
-	// Read version in same session
-	verResp, _ := conn.sendAndRead("AT+VER\r\n")
-	version := parseVersion(verResp)
-
-	if err := exitAT(conn); err != nil {
-		return params, version, err
 	}
 	return params, version, nil
 }

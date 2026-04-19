@@ -316,3 +316,27 @@ func TestViewClosed_States(t *testing.T) {
 		assert.Contains(t, stripped, "▼")
 	})
 }
+
+func TestToggleOpen_SelectedAtEnd(t *testing.T) {
+	field := makeDropdownField()
+	field.maxVisible = 3
+	field.Selected = 4 // last option
+
+	field.ToggleOpen()
+	assert.True(t, field.Open)
+	// scrollOffset should clamp to maxOff = len(Options) - maxVisible = 2
+	assert.Equal(t, 2, field.scrollOffset)
+}
+
+func TestRenderDropdown_NoScrollIndicators(t *testing.T) {
+	field := newField(ParamDef{
+		Label: "Small", ATCmd: "SM", AllpIndex: 0,
+		Options: []Option{{"0", "A"}, {"1", "B"}},
+	})
+	field.Open = true
+	field.Selected = 0
+
+	dropdown := field.RenderDropdown()
+	assert.NotContains(t, dropdown, "↑")
+	assert.NotContains(t, dropdown, "↓")
+}

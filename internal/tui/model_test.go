@@ -2,6 +2,8 @@ package tui
 
 import (
 	"errors"
+	"lora-config-SX1262/internal/device"
+	devicemock "lora-config-SX1262/internal/device/mock"
 	"strings"
 	"testing"
 
@@ -769,4 +771,145 @@ func TestHandleEnter_DisabledField(t *testing.T) {
 	newM, _ := mdl.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := newM.(model)
 	assert.False(t, got.fields[0].Open)
+}
+
+// --- Coverage gap tests ---
+
+func connectedModelWithConn() model {
+	mdl := connectedModel()
+	port := devicemock.ForResponses()
+	mdl.conn = device.NewSerialConn(port)
+	return mdl
+}
+
+func TestUpdate_TextInputForwarding(t *testing.T) {
+	mdl := testModel()
+	mdl.focusIndex = focusDevice
+
+	// Send a non-key message (cursor blink) — exercises text input forwarding path
+	newM, _ := mdl.Update(tea.MouseMsg{})
+	got := newM.(model)
+	assert.Equal(t, focusDevice, got.focusIndex)
+}
+
+func TestUpdate_NumInputForwarding(t *testing.T) {
+	mdl := connectedModel()
+	for idx, field := range mdl.fields {
+		if field.IsNumInput {
+			mdl.fields[idx].Editing = true
+			mdl.fields[idx].NumInput.Focus()
+			mdl.focusIndex = idx
+
+			// Send a non-key message — exercises numeric input forwarding path
+			newM, _ := mdl.Update(tea.MouseMsg{})
+			got := newM.(model)
+			assert.True(t, got.fields[idx].Editing)
+			return
+		}
+	}
+	t.Skip("no numeric fields found")
+}
+
+func TestHandleNumInputKey_DigitForwarding(t *testing.T) {
+	mdl := connectedModel()
+	for idx, field := range mdl.fields {
+		if field.IsNumInput {
+			mdl.fields[idx].Editing = true
+			mdl.fields[idx].NumInput.Focus()
+			mdl.fields[idx].NumInput.SetValue("")
+			mdl.focusIndex = idx
+
+			// Type a digit
+			newM, _ := mdl.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'5'}})
+			got := newM.(model)
+			assert.Contains(t, got.fields[idx].NumInput.Value(), "5")
+			return
+		}
+	}
+	t.Skip("no numeric fields found")
+}
+
+func TestHandleEnter_RestoreWithConn(t *testing.T) {
+	mdl := connectedModelWithConn()
+	mdl.focusIndex = focusRestore
+
+	newM, cmd := mdl.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := newM.(model)
+	assert.Contains(t, got.statusMsg, "Restoring")
+	assert.NotNil(t, cmd)
+}
+
+func TestHandleEnter_RebootWithConn(t *testing.T) {
+	mdl := connectedModelWithConn()
+	mdl.focusIndex = focusReboot
+
+	newM, cmd := mdl.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := newM.(model)
+	assert.Contains(t, got.statusMsg, "Rebooting")
+	assert.NotNil(t, cmd)
+}
+
+func TestKeyLeft_SwitchColumn(t *testing.T) {
+	mdl := connectedModel()
+	mdl.focusIndex = mdl.rightCol[0]
+	mdl.updateFocus()
+
+	newM, _ := mdl.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	got := newM.(model)
+	assert.Equal(t, mdl.leftCol[0], got.focusIndex)
+}
+
+func TestDropdownEsc_RevertsValue(t *testing.T) {
+	mdl := connectedModel()
+	for idx, field := range mdl.fields {
+		if !field.IsNumInput {
+			mdl.fields[idx].Open = true
+			mdl.fields[idx].LastValue = field.Options[0].Value
+			mdl.fields[idx].Selected = 2 // changed from original
+			mdl.focusIndex = idx
+
+			newM, _ := mdl.Update(tea.KeyMsg{Type: tea.KeyEscape})
+			got := newM.(model)
+			assert.False(t, got.fields[idx].Open)
+			assert.Equal(t, 0, got.fields[idx].Selected)
+			return
+		}
+	}
+}
+
+func TestFocusNextInColumn_RightColumnLast(t *testing.T) {
+	mdl := connectedModel()
+	mdl.focusIndex = mdl.rightCol[len(mdl.rightCol)-1]
+
+	mdl.focusNextInColumn()
+	assert.Equal(t, focusRestore, mdl.focusIndex)
+}
+
+func TestFocusPrevInColumn_RightColumnFirst(t *testing.T) {
+	mdl := connectedModel()
+	mdl.focusIndex = mdl.rightCol[0]
+
+	mdl.focusPrevInColumn()
+	assert.Equal(t, focusConnect, mdl.focusIndex)
+}
+
+func TestFieldPosition_UnknownIndex(t *testing.T) {
+	mdl := connectedModel()
+	col, row := mdl.fieldPosition(999)
+	assert.Equal(t, 0, col)
+	assert.Equal(t, 0, row)
+}
+
+func TestView_ShowsStatusMsg(t *testing.T) {
+	mdl := testModel()
+	mdl.statusMsg = "Testing status display"
+	view := mdl.View()
+	assert.Contains(t, view, "Testing status display")
+}
+
+func TestView_AfterWindowSize(t *testing.T) {
+	mdl := testModel()
+	newM, _ := mdl.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	got := newM.(model)
+	assert.NotPanics(t, func() { got.View() })
 }
