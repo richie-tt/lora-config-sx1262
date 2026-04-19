@@ -42,7 +42,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v6
         with:
@@ -59,7 +59,7 @@ jobs:
           go build -ldflags "$LDFLAGS" -o lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/lora-config-sx1262
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}
           path: lora-config-SX1262-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
@@ -70,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -120,7 +120,7 @@ jobs:
 
       - name: Download all artifacts
         if: steps.version.outputs.skip != 'true'
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -160,7 +160,7 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.version.outputs.skip != 'true'
-        uses: softprops/action-gh-release@v2.3.2
+        uses: softprops/action-gh-release@v3.0.0
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Release ${{ steps.version.outputs.tag }}
