@@ -264,3 +264,13 @@ func TestWithATSession_Success(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+
+func TestEnterAT_ResetBufferError(t *testing.T) {
+	port := new(devicemock.Port)
+	port.On("ResetInputBuffer").Return(errors.New("reset failed"))
+	conn := NewSerialConn(port)
+
+	err := enterAT(conn)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "reset buffer")
+}
