@@ -265,6 +265,26 @@ func TestWithATSession_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestExitAT_WriteError(t *testing.T) {
+	port := new(devicemock.Port)
+	port.On("ResetInputBuffer").Return(nil)
+	port.On("Write", []byte("AT+EXIT\r\n")).Return(0, errWrite)
+	conn := NewSerialConn(port)
+
+	assert.ErrorContains(t, exitAT(conn), "exit AT mode")
+}
+
+func TestSendAndRead_WriteError(t *testing.T) {
+	port := new(devicemock.Port)
+	port.On("ResetInputBuffer").Return(nil)
+	port.On("Write", tmock.Anything).Return(0, errWrite)
+	conn := NewSerialConn(port)
+
+	_, err := conn.sendAndRead("AT+TEST\r\n")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "write")
+}
+
 func TestEnterAT_ResetBufferError(t *testing.T) {
 	port := new(devicemock.Port)
 	port.On("ResetInputBuffer").Return(errors.New("reset failed"))
