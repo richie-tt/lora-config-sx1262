@@ -219,3 +219,48 @@ func TestSendAndRead_ResetBufferError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "reset buffer")
 }
+
+// --- withATSession ---
+
+func TestWithATSession_ExitErrorSurfaced(t *testing.T) {
+	// Enter succeeds, callback succeeds, exit fails
+	port := new(devicemock.Port)
+	port.On("ResetInputBuffer").Return(nil)
+	port.On("Write", []byte("+++\r\n")).Return(0, nil)
+	port.On("Read", tmock.Anything).Return([]byte("+++"), nil).Once()
+	port.On("Write", []byte("AT+EXIT\r\n")).Return(0, nil)
+	port.On("Read", tmock.Anything).Return([]byte("ERROR"), nil).Once()
+	conn := NewSerialConn(port)
+
+	err := conn.withATSession(func() error {
+		return nil // callback succeeds
+	})
+	assert.ErrorContains(t, err, "exit AT mode")
+}
+
+func TestWithATSession_CallbackErrorPriority(t *testing.T) {
+	// Enter succeeds, callback fails, exit succeeds — callback error wins
+	port := new(devicemock.Port)
+	port.On("ResetInputBuffer").Return(nil)
+	port.On("Write", []byte("+++\r\n")).Return(0, nil)
+	port.On("Read", tmock.Anything).Return([]byte("+++"), nil).Once()
+	port.On("Write", []byte("AT+EXIT\r\n")).Return(0, nil)
+	port.On("Read", tmock.Anything).Return([]byte("OK"), nil).Once()
+	conn := NewSerialConn(port)
+
+	cbErr := errors.New("callback failed")
+	err := conn.withATSession(func() error {
+		return cbErr
+	})
+	assert.ErrorIs(t, err, cbErr)
+}
+
+func TestWithATSession_Success(t *testing.T) {
+	port := devicemock.ForResponses("+++", "OK")
+	conn := NewSerialConn(port)
+
+	err := conn.withATSession(func() error {
+		return nil
+	})
+	require.NoError(t, err)
+}

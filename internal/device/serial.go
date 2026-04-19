@@ -89,3 +89,23 @@ func (s *SerialConn) sendAndRead(cmd string) (string, error) {
 	}
 	return strings.TrimSpace(resp), fmt.Errorf("timeout: incomplete response: %s", resp)
 }
+
+// withATSession acquires the session lock, enters AT mode, runs callback, exits AT mode.
+// If callback returns an error, exitAT is still attempted and both errors are reported.
+// Callback error takes priority over exit error.
+func (s *SerialConn) withATSession(callback func() error) error {
+	s.LockSession()
+	defer s.UnlockSession()
+
+	if err := enterAT(s); err != nil {
+		return err
+	}
+
+	callbackErr := callback()
+	exitErr := exitAT(s)
+
+	if callbackErr != nil {
+		return callbackErr
+	}
+	return exitErr
+}
