@@ -54,7 +54,9 @@ func (s *SerialConn) UnlockSession() {
 
 // sendAndRead writes a command and reads the response. NOT thread-safe — caller must hold session lock.
 func (s *SerialConn) sendAndRead(cmd string) (string, error) {
-	_ = s.port.ResetInputBuffer()
+	if err := s.port.ResetInputBuffer(); err != nil {
+		return "", fmt.Errorf("reset buffer: %w", err)
+	}
 
 	_, err := s.port.Write([]byte(cmd))
 	if err != nil {
@@ -66,16 +68,17 @@ func (s *SerialConn) sendAndRead(cmd string) (string, error) {
 	tmp := make([]byte, 256)
 
 	for time.Now().Before(deadline) {
-		n, err := s.port.Read(tmp)
-		if n > 0 {
-			buf.Write(tmp[:n])
+		bytesRead, err := s.port.Read(tmp)
+		if bytesRead > 0 {
+			buf.Write(tmp[:bytesRead])
 			resp := buf.String()
 			if strings.Contains(resp, "OK") || strings.Contains(resp, "ERROR") || strings.Contains(resp, "+++") {
 				time.Sleep(interCmdDelay)
 				return strings.TrimSpace(resp), nil
 			}
 		}
-		if err != nil {
+		if err != nil || bytesRead == 0 {
+			time.Sleep(time.Millisecond) // yield to prevent CPU spin
 			continue
 		}
 	}
@@ -84,5 +87,5 @@ func (s *SerialConn) sendAndRead(cmd string) (string, error) {
 	if resp == "" {
 		return "", fmt.Errorf("timeout: no response")
 	}
-	return strings.TrimSpace(resp), nil
+	return strings.TrimSpace(resp), fmt.Errorf("timeout: incomplete response: %s", resp)
 }

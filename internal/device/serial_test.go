@@ -194,3 +194,28 @@ func TestNewSerialConn(t *testing.T) {
 	conn := NewSerialConn(new(devicemock.Port))
 	require.NotNil(t, conn)
 }
+
+func TestSendAndRead_PartialTimeout(t *testing.T) {
+	// Port returns partial data but never OK/ERROR/+++
+	port := new(devicemock.Port)
+	port.On("ResetInputBuffer").Return(nil)
+	port.On("Write", tmock.Anything).Return(0, nil)
+	port.On("Read", tmock.Anything).Return([]byte("partial"), nil).Once()
+	port.On("Read", tmock.Anything).Return(0, nil) // subsequent reads return nothing
+	conn := NewSerialConn(port)
+
+	resp, err := conn.sendAndRead("AT+TEST\r\n")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "timeout")
+	assert.Contains(t, resp, "partial")
+}
+
+func TestSendAndRead_ResetBufferError(t *testing.T) {
+	port := new(devicemock.Port)
+	port.On("ResetInputBuffer").Return(errors.New("reset failed"))
+	conn := NewSerialConn(port)
+
+	_, err := conn.sendAndRead("AT+TEST\r\n")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "reset buffer")
+}
