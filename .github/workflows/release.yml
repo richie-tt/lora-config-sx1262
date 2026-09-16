@@ -3,14 +3,15 @@ name: Release
 on:
   push:
     branches: [master]
+    # Release only on changes that affect the built binary - workflow and
+    # lint-config changes must not produce a new version.
     paths:
       - "**.go"
       - "go.mod"
       - "go.sum"
       - "Makefile"
-      - ".github/workflows/**"
-      - ".golangci.yml"
-      - ".pre-commit-config.yaml"
+  # Manual run, e.g. to release pending deps: commits without a code change.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -87,6 +88,7 @@ jobs:
           PATCH=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f3)
 
           # Analyze commit messages since last tag
+          # feat: -> minor; fix:, deps: (go.mod updates) -> patch; anything else -> no release
           if [ "$LATEST_TAG" = "v0.0.0" ]; then
             COMMITS=$(git log --oneline --format="%s")
           else
@@ -97,7 +99,7 @@ jobs:
           while IFS= read -r msg; do
             if echo "$msg" | grep -qiE '^feat(\(.+\))?:'; then
               BUMP="minor"
-            elif echo "$msg" | grep -qiE '^fix(\(.+\))?:' && [ "$BUMP" != "minor" ]; then
+            elif echo "$msg" | grep -qiE '^(fix|deps)(\(.+\))?:' && [ "$BUMP" != "minor" ]; then
               BUMP="patch"
             fi
           done <<< "$COMMITS"
@@ -108,7 +110,7 @@ jobs:
           elif [ "$BUMP" = "patch" ]; then
             PATCH=$((PATCH + 1))
           else
-            echo "No fix: or feat: commits found — skipping release."
+            echo "No feat:, fix: or deps: commits found — skipping release."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
