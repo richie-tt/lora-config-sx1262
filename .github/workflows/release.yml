@@ -3,14 +3,15 @@ name: Release
 on:
   push:
     branches: [master]
+    # Release only on changes that affect the built binary - workflow and
+    # lint-config changes must not produce a new version.
     paths:
       - "**.go"
       - "go.mod"
       - "go.sum"
       - "Makefile"
-      - ".github/workflows/**"
-      - ".golangci.yml"
-      - ".pre-commit-config.yaml"
+  # Manual run, e.g. to release pending deps: commits without a code change.
+  workflow_dispatch:
 
 permissions:
   contents: write
